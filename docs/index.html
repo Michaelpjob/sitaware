@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Situational Awareness LP — 13F Tracker</title>
+<meta name="description" content="A weekly-updated dashboard tracking Situational Awareness LP's public 13F filings: positions, estimated returns, and quarter-over-quarter changes.">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Situational Awareness Tracker">
+<meta property="og:title" content="Situational Awareness LP — 13F Portfolio Tracker">
+<meta property="og:description" content="Tracking Situational Awareness LP's 13F filings: positions, returns, and QoQ changes. Updated weekly from SEC EDGAR.">
+<meta property="og:url" content="https://example.com"><meta property="og:image" content="https://example.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Situational Awareness LP — 13F Portfolio Tracker">
+<meta name="twitter:description" content="Weekly-updated dashboard of Situational Awareness LP's public 13F filings.">
+<meta name="twitter:image" content="https://example.com/og.png">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231a7f4e'/%3E%3Cpath d='M14 44 L24 34 L34 40 L50 20' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
+
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #fafaf7;
+    --surface: #fff;
+    --surface-alt: #f5f3ec;
+    --surface-hover: #faf9f3;
+    --border: #e6e4dd;
+    --border-soft: #f1efe8;
+    --border-dotted: #eae8e0;
+    --text: #1a1a1a;
+    --text-muted: #6b6a63;
+    --text-faint: #8a897f;
+    --text-very-faint: #9a9890;
+    --link: #2b5aa6;
+    --pos: #1a7f4e;
+    --pos-bg: #e7f5ee;
+    --neg: #9c2c2c;
+    --neg-bg: #fbeaea;
+    --warn: #b5760a;
+    --warn-bg: #fbf1db;
+    --option-row: #faf8ef;
+    --option-row-hover: #f5f2e6;
+    --tag-bg: #f1efe8;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #141413;
+    --surface: #1e1d1b;
+    --surface-alt: #262523;
+    --surface-hover: #2a2927;
+    --border: #34332f;
+    --border-soft: #2a2927;
+    --border-dotted: #2e2d2a;
+    --text: #eeece4;
+    --text-muted: #a8a69c;
+    --text-faint: #7a7970;
+    --text-very-faint: #5e5d55;
+    --link: #7ba8e5;
+    --pos: #4ad08a;
+    --pos-bg: #1c3a2a;
+    --neg: #e87878;
+    --neg-bg: #3a1f1f;
+    --warn: #e0a94c;
+    --warn-bg: #3a2f15;
+    --option-row: #252321;
+    --option-row-hover: #2c2a27;
+    --tag-bg: #2a2927;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+    --shadow-md: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root[data-theme="auto"] {
+      color-scheme: dark;
+      --bg: #141413; --surface: #1e1d1b; --surface-alt: #262523; --surface-hover: #2a2927;
+      --border: #34332f; --border-soft: #2a2927; --border-dotted: #2e2d2a;
+      --text: #eeece4; --text-muted: #a8a69c; --text-faint: #7a7970; --text-very-faint: #5e5d55;
+      --link: #7ba8e5;
+      --pos: #4ad08a; --pos-bg: #1c3a2a; --neg: #e87878; --neg-bg: #3a1f1f;
+      --warn: #e0a94c; --warn-bg: #3a2f15;
+      --option-row: #252321; --option-row-hover: #2c2a27; --tag-bg: #2a2927;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.3); --shadow-md: 0 2px 8px rgba(0,0,0,0.4);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.45;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+  /* Header */
+  .top-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
+  .top-bar .brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  .top-bar h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .top-bar .tag { color: var(--text-faint); font-size: 13px; font-weight: 400; white-space: nowrap; }
+  .top-bar .actions { display: flex; align-items: center; gap: 8px; }
+  .icon-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background 0.12s, color 0.12s; }
+  .icon-btn:hover { background: var(--surface-hover); color: var(--text); }
+  .icon-btn svg { width: 14px; height: 14px; }
+
+  .sub { color: var(--text-muted); font-size: 13px; margin-bottom: 18px; }
+  .sub a { color: var(--link); text-decoration: none; }
+  .sub a:hover { text-decoration: underline; }
+  .sub code { font-size: 11px; background: var(--tag-bg); padding: 1px 5px; border-radius: 3px; }
+
+  /* Summary stats */
+  .summary { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 16px 0 22px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; box-shadow: var(--shadow-sm); }
+  .stat .label { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+  .stat .value { font-size: 18px; font-weight: 600; color: var(--text); }
+  .stat .value.small { font-size: 15px; font-weight: 500; }
+  .stat .delta { font-size: 11px; margin-top: 2px; color: var(--text-faint); }
+  .stat .sparkline { margin-top: 6px; height: 28px; }
+
+  /* Diff panels */
+  .diff-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 22px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; min-height: 140px; box-shadow: var(--shadow-sm); }
+  .panel h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 10px; color: var(--text-muted); font-weight: 600; }
+  .panel h3 .count { display: inline-block; margin-left: 6px; background: var(--tag-bg); color: var(--text-muted); padding: 1px 6px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .panel.buys h3 { color: var(--pos); } .panel.buys h3 .count { background: var(--pos-bg); color: var(--pos); }
+  .panel.exits h3 { color: var(--neg); } .panel.exits h3 .count { background: var(--neg-bg); color: var(--neg); }
+  .panel.changes h3 { color: var(--warn); } .panel.changes h3 .count { background: var(--warn-bg); color: var(--warn); }
+  .panel ul { list-style: none; margin: 0; padding: 0; }
+  .panel li { padding: 5px 0; border-bottom: 1px dotted var(--border-dotted); font-size: 13px; display: flex; justify-content: space-between; gap: 8px; }
+  .panel li:last-child { border-bottom: none; }
+  .panel li .name { flex: 1; }
+  .panel li .amt { color: var(--text-muted); font-variant-numeric: tabular-nums; font-size: 12px; white-space: nowrap; }
+
+  .pc-tag { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--tag-bg); color: var(--text-muted); margin-left: 4px; font-weight: 600; }
+  .pc-call { background: var(--pos-bg); color: var(--pos); }
+  .pc-put { background: var(--neg-bg); color: var(--neg); }
+
+  /* Filters */
+  .filters { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+  .filters input[type="text"] { padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; width: 200px; background: var(--surface); color: var(--text); }
+  .filters input[type="text"]::placeholder { color: var(--text-very-faint); }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); cursor: pointer; }
+
+  /* Holdings table */
+  table.holdings { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; font-size: 13px; box-shadow: var(--shadow-sm); }
+  table.holdings th { background: var(--surface-alt); padding: 10px; text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap; }
+  table.holdings th:hover { background: var(--surface-hover); color: var(--text); }
+  table.holdings th .arrow { opacity: 0.4; margin-left: 3px; font-size: 10px; }
+  table.holdings th.sort-asc .arrow, table.holdings th.sort-desc .arrow { opacity: 1; color: var(--text); }
+  table.holdings td { padding: 8px 10px; border-bottom: 1px solid var(--border-soft); vertical-align: middle; color: var(--text); }
+  table.holdings tr:hover td { background: var(--surface-hover); }
+  table.holdings tr.option-row td { background: var(--option-row); }
+  table.holdings tr.option-row:hover td { background: var(--option-row-hover); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .name-cell { font-weight: 500; }
+  .ticker { color: var(--text-muted); font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--tag-bg); padding: 1px 5px; border-radius: 3px; margin-left: 4px; }
+  .pos { color: var(--pos); font-weight: 500; }
+  .neg { color: var(--neg); font-weight: 500; }
+  .muted { color: var(--text-very-faint); }
+  .flag { font-size: 11px; color: var(--warn); cursor: help; }
+
+  /* Signup card */
+  .signup { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; margin: 24px 0; display: flex; gap: 20px; align-items: center; box-shadow: var(--shadow-sm); flex-wrap: wrap; }
+  .signup .pitch { flex: 1; min-width: 240px; }
+  .signup h4 { margin: 0 0 4px; font-size: 15px; font-weight: 600; color: var(--text); }
+  .signup p { margin: 0; font-size: 13px; color: var(--text-muted); }
+  .signup form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .signup input[type="email"] { padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; min-width: 240px; background: var(--bg); color: var(--text); }
+  .signup input[type="email"]::placeholder { color: var(--text-very-faint); }
+  .signup input[type="email"]:focus { outline: 2px solid var(--link); outline-offset: -1px; border-color: var(--link); }
+  .signup button { padding: 8px 16px; background: var(--pos); color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: opacity 0.12s; }
+  .signup button:hover { opacity: 0.9; }
+  .signup button:disabled { opacity: 0.5; cursor: default; }
+  .signup .status { font-size: 13px; color: var(--text-muted); margin-top: 6px; min-height: 1.2em; }
+  .signup .status.ok { color: var(--pos); }
+  .signup .status.err { color: var(--neg); }
+
+  footer { margin-top: 22px; padding: 14px 0 4px; border-top: 1px solid var(--border); color: var(--text-faint); font-size: 12px; line-height: 1.6; }
+  footer strong { color: var(--text-muted); }
+  footer a { color: var(--link); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  @media (max-width: 900px) {
+    .summary { grid-template-columns: repeat(2, 1fr); }
+    .diff-grid { grid-template-columns: 1fr; }
+    .wrap { padding: 14px; }
+    .top-bar h1 { font-size: 18px; }
+    .top-bar .tag { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="top-bar">
+  <div class="brand">
+    <h1>Situational Awareness LP</h1>
+    <span class="tag">— 13F Portfolio Tracker</span>
+  </div>
+  <div class="actions">
+    <button class="icon-btn" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      <span id="theme-label">Auto</span>
+    </button>
+  </div>
+</div>
+
+<div class="sub">
+  CIK <a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0002045724&type=13F&dateb=&owner=include&count=40" target="_blank" rel="noopener">0002045724</a>
+  · Latest filing: 2026-02-11 for period 2025-12-31
+  · Accession: <code>0002045724-26-000002</code>
+</div>
+
+<div class="summary" id="summary"></div>
+
+<div class="diff-grid">
+  <div class="panel buys">
+    <h3>New buys this quarter <span class="count" id="buys-count">0</span></h3>
+    <ul id="buys-list"></ul>
+  </div>
+  <div class="panel exits">
+    <h3>Exits / closed this quarter <span class="count" id="exits-count">0</span></h3>
+    <ul id="exits-list"></ul>
+  </div>
+  <div class="panel changes">
+    <h3>Size changes (vs prior Q) <span class="count" id="changes-count">0</span></h3>
+    <ul id="changes-list"></ul>
+  </div>
+</div>
+
+<div class="filters">
+  <input type="text" id="search" placeholder="Filter by name or ticker…" />
+  <label class="toggle"><input type="checkbox" id="hide-options" /> Hide options</label>
+  <label class="toggle"><input type="checkbox" id="hide-shorts" /> Hide shorts (puts)</label>
+  <span style="margin-left:auto;color:var(--text-faint);font-size:12px;" id="row-count"></span>
+</div>
+
+<table class="holdings" id="table">
+  <thead>
+    <tr>
+      <th data-sort="issuer" data-type="str">Issuer <span class="arrow">↕</span></th>
+      <th data-sort="putCall" data-type="str">Type <span class="arrow">↕</span></th>
+      <th class="num" data-sort="latestValueUsd" data-type="num">Value ($) <span class="arrow">↕</span></th>
+      <th class="num" data-sort="pctPortfolio" data-type="num">% Port <span class="arrow">↕</span></th>
+      <th class="num" data-sort="latestShares" data-type="num">Shares <span class="arrow">↕</span></th>
+      <th class="num" data-sort="qEndPrice" data-type="num">Q-end Px <span class="arrow">↕</span></th>
+      <th class="num" data-sort="entryPrice" data-type="num">Est. Entry <span class="arrow">↕</span></th>
+      <th class="num" data-sort="currentPrice" data-type="num">Current Px <span class="arrow">↕</span></th>
+      <th class="num" data-sort="currentValueUsd" data-type="num">Current $ <span class="arrow">↕</span></th>
+      <th class="num" data-sort="estReturnPct" data-type="num">Est. Return <span class="arrow">↕</span></th>
+      <th class="num" data-sort="qoqSharesPct" data-type="num">QoQ Shares <span class="arrow">↕</span></th>
+    </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+
+<div class="signup">
+  <div class="pitch">
+    <h4>Get notified when a new 13F drops</h4>
+    <p>One email per quarter when Situational Awareness LP files with the SEC. No spam, unsubscribe anytime.</p>
+  </div>
+  <form id="signup-form">
+    <input type="email" name="email" id="signup-email" placeholder="you@example.com" required autocomplete="email">
+    <button type="submit" id="signup-submit">Subscribe</button>
+    <div class="status" id="signup-status"></div>
+  </form>
+</div>
+
+<footer>
+  <div><strong>Data source:</strong> SEC EDGAR 13F-HR filings. Latest period: 2025-12-31 (filed 2026-02-11). Prior period: 2025-09-30 (filed 2025-11-14). Current prices as of 2026-04-23.</div>
+  <div style="margin-top:6px;"><strong>Methodology:</strong> 13Fs are filed quarterly with a ~45-day lag and show long U.S. equity and option positions only — they don't show short common-stock positions, fixed-income, non-U.S. listings, or private holdings. "Value" and shares are as reported. "Q-end Px" is derived from value ÷ shares. "Est. entry" uses the quarterly mean daily close for the first quarter the position appeared — a proxy for VWAP. "Est. return" compares current price to the entry proxy and does NOT reflect actual fills or costs paid. Returns on option rows show % change in underlying reference price, not option P&L (option premiums aren't disclosed in 13Fs).</div>
+  <div style="margin-top:6px;"><strong>Not investment advice.</strong> This is a tool to observe public filings, not a recommendation to buy or sell anything.</div>
+  <div style="margin-top:10px;"><strong>Generated:</strong> 2026-04-23 · <a href="https://github.com/yourname/situational-awareness-tracker">Open source on GitHub</a></div>
+</footer>
+
+</div>
+
+<script id="payload-data" type="application/json">[{"issuer": "BLOOM ENERGY CORP", "ticker": "BE", "cusip": "093712107", "titleOfClass": "COM CL A", "putCall": null, "latestShares": 10076022, "latestValueUsd": 875505552, "priorShares": 3048002, "priorValueUsd": 43890344, "pctPortfolio": 62.25763277701941, "qEndPrice": 86.89000004168312, "entryPrice": 86.89, "currentPrice": 229.75, "currentValueUsd": 2314966054.5, "estReturnPct": 164.41477730463808, "qoqSharesPct": 230.57793269164523, "isNew": false, "flag": "Q3 filed under convertible CUSIP (093712AH0); Q4 uses common. Entry priced at Q-end."}, {"issuer": "BLOOM ENERGY CORP", "ticker": "BE", "cusip": "093712107", "titleOfClass": "COM CL A", "putCall": "Call", "latestShares": 408500, "latestValueUsd": 35494565, "priorShares": null, "priorValueUsd": null, "pctPortfolio": 2.5240360707044904, "qEndPrice": 86.89, "entryPrice": 86.89, "currentPrice": 229.75, "currentValueUsd": 93852875.0, "estReturnPct": 164.41477730463808, "qoqSharesPct": null, "isNew": true, "flag": null}, {"issuer": "COREWEAVE INC", "ticker": "CRWV", "cusip": "21873S108", "titleOfClass": "COM CL A", "putCall": null, "latestShares": 6098812, "latestValueUsd": 436735927, "priorShares": 4115456, "priorValueUsd": 563200154, "pctPortfolio": 31.056507753245132, "qEndPrice": 71.60999994753077, "entryPrice": 136.85, "currentPrice": 122.54, "currentValueUsd": 747348422.48, "estReturnPct": -10.456704420898786, "qoqSharesPct": 48.192861252799204, "isNew": false, "flag": null}, {"issuer": "KILROY RLTY CORP", "ticker": "KRC", "cusip": "49427F108", "titleOfClass": "COM", "putCall": null, "latestShares": 1327700, "latestValueUsd": 49616149, "priorShares": null, "priorValueUsd": null, "pctPortfolio": 3.5282288926614127, "qEndPrice": 37.37, "entryPrice": 37.37, "currentPrice": 29.18, "currentValueUsd": 38742286.0, "estReturnPct": -21.91597538132191, "qoqSharesPct": null, "isNew": true, "flag": null}, {"issuer": "INFOSYS LTD", "ticker": "INFY", "cusip": "456788108", "titleOfClass": "SPONSORED ADR", "putCall": "Put", "latestShares": 500000, "latestValueUsd": 8910000, "priorShares": null, "priorValueUsd": null, "pctPortfolio": 0.633594506369553, "qEndPrice": 17.82, "entryPrice": 17.82, "currentPrice": 13.48, "currentValueUsd": 6740000.0, "estReturnPct": -24.354657687991022, "qoqSharesPct": null, "isNew": true, "flag": null}]</script>
+<script id="exits-data" type="application/json">[{"issuer": "NVIDIA CORPORATION", "ticker": "NVDA", "cusip": "67066G104", "put_call": "Put", "prior_value_usd": 298528000}, {"issuer": "VISTRA CORP", "ticker": "VST", "cusip": "92840M102", "put_call": null, "prior_value_usd": 252327327}]</script>
+<script id="aum-history-data" type="application/json">[{"period": "2024-06-30", "filing_date": "2024-08-14", "accession": "fake1", "total_usd": 420000000}, {"period": "2024-09-30", "filing_date": "2024-11-14", "accession": "fake2", "total_usd": 560000000}, {"period": "2024-12-31", "filing_date": "2025-02-14", "accession": "fake3", "total_usd": 740000000}, {"period": "2025-03-31", "filing_date": "2025-05-15", "accession": "fake4", "total_usd": 920000000}, {"period": "2025-06-30", "filing_date": "2025-08-14", "accession": "fake5", "total_usd": 1050000000}, {"period": "2025-09-30", "filing_date": "2025-11-14", "accession": "0002045724-25-000008", "total_usd": 1157945825}, {"period": "2025-12-31", "filing_date": "2026-02-11", "accession": "0002045724-26-000002", "total_usd": 1406262193}]</script>
+
+<script>
+// ---- Theme toggle (auto / light / dark) ----
+(function() {
+  const root = document.documentElement;
+  const btn = document.getElementById('theme-toggle');
+  const label = document.getElementById('theme-label');
+  const stored = localStorage.getItem('theme') || 'auto';
+  const modes = ['auto', 'light', 'dark'];
+  const labels = { auto: 'Auto', light: 'Light', dark: 'Dark' };
+  function apply(m) { root.setAttribute('data-theme', m); label.textContent = labels[m]; localStorage.setItem('theme', m); }
+  apply(stored);
+  btn.addEventListener('click', () => {
+    const cur = root.getAttribute('data-theme');
+    apply(modes[(modes.indexOf(cur) + 1) % modes.length]);
+    if (window.__redrawSparklines) window.__redrawSparklines();
+  });
+})();
+
+// ---- Data ----
+const HOLDINGS = JSON.parse(document.getElementById('payload-data').textContent);
+const EXITS = JSON.parse(document.getElementById('exits-data').textContent);
+const AUM_HISTORY = JSON.parse(document.getElementById('aum-history-data').textContent || '[]');
+
+const FILING = {
+  latestTotalValue: 1406262193,
+  priorTotalValue: 1157945825,
+  pricesAsOf: "2026-04-23"
+};
+
+// ---- Format helpers ----
+const fmtMoney = n => {
+  if (n == null || isNaN(n)) return '—';
+  if (Math.abs(n) >= 1e9) return '$' + (n/1e9).toFixed(2) + 'B';
+  if (Math.abs(n) >= 1e6) return '$' + (n/1e6).toFixed(1) + 'M';
+  if (Math.abs(n) >= 1e3) return '$' + (n/1e3).toFixed(0) + 'K';
+  return '$' + n.toFixed(0);
+};
+const fmtPx = n => n == null ? '—' : '$' + n.toFixed(2);
+const fmtShares = n => n == null ? '—' : n.toLocaleString('en-US');
+const fmtPct = n => {
+  if (n == null || !isFinite(n)) return '—';
+  const s = n >= 0 ? '+' : '';
+  return s + n.toFixed(1) + '%';
+};
+const fmtPctClean = n => n == null ? '—' : n.toFixed(1) + '%';
+const clsReturn = n => n == null ? 'muted' : (n >= 0 ? 'pos' : 'neg');
+const pcTag = pc => pc ? `<span class="pc-tag ${pc === 'Call' ? 'pc-call' : 'pc-put'}">${pc.toUpperCase()}</span>` : '';
+
+// ---- Sparkline renderer (vanilla SVG) ----
+function sparkline(values, opts = {}) {
+  if (!values || values.length < 2) return '';
+  const w = opts.width || 120;
+  const h = opts.height || 28;
+  const pad = 2;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const step = (w - pad * 2) / (values.length - 1);
+  const pts = values.map((v, i) => {
+    const x = pad + i * step;
+    const y = h - pad - ((v - min) / range) * (h - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const lastX = pad + (values.length - 1) * step;
+  const lastY = h - pad - ((values[values.length - 1] - min) / range) * (h - pad * 2);
+  const strokeColor = values[values.length - 1] >= values[0]
+    ? 'var(--pos)' : 'var(--neg)';
+  const fillColor = values[values.length - 1] >= values[0]
+    ? 'var(--pos-bg)' : 'var(--neg-bg)';
+  const areaPts = [`${pad},${h - pad}`, ...pts, `${lastX.toFixed(1)},${h - pad}`].join(' ');
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="none" style="overflow:visible">
+    <polygon points="${areaPts}" fill="${fillColor}" opacity="0.5"/>
+    <polyline points="${pts.join(' ')}" fill="none" stroke="${strokeColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="2" fill="${strokeColor}"/>
+  </svg>`;
+}
+
+// ---- Summary ----
+const latestAUM = FILING.latestTotalValue;
+const priorAUM = FILING.priorTotalValue;
+const aumDelta = priorAUM ? ((latestAUM - priorAUM) / priorAUM) * 100 : null;
+
+const currentAUMEstimate = HOLDINGS
+  .filter(h => h.currentValueUsd != null && h.putCall == null)
+  .reduce((s, h) => s + h.currentValueUsd, 0);
+
+const top5 = [...HOLDINGS].sort((a,b) => b.latestValueUsd - a.latestValueUsd).slice(0,5);
+const top5Concentration = top5.reduce((s,h) => s + h.pctPortfolio, 0);
+
+const numLongs = HOLDINGS.filter(h => h.putCall == null).length;
+const numCalls = HOLDINGS.filter(h => h.putCall === 'Call').length;
+const numPuts  = HOLDINGS.filter(h => h.putCall === 'Put').length;
+
+// AUM sparkline needs history (values oldest-first).
+const aumSeries = AUM_HISTORY.map(p => p.total_usd);
+const aumSparkHtml = aumSeries.length >= 2
+  ? `<div class="sparkline" title="${AUM_HISTORY.map(p => p.period + ': ' + fmtMoney(p.total_usd)).join(' · ')}">${sparkline(aumSeries)}</div>`
+  : '';
+
+function renderSummary() {
+  document.getElementById('summary').innerHTML = `
+    <div class="stat">
+      <div class="label">Reported AUM (latest)</div>
+      <div class="value">${fmtMoney(latestAUM)}</div>
+      <div class="delta ${aumDelta == null ? '' : (aumDelta >= 0 ? 'pos' : 'neg')}">${aumDelta == null ? '—' : fmtPct(aumDelta) + ' vs prior Q'}</div>
+      ${aumSparkHtml}
+    </div>
+    <div class="stat">
+      <div class="label">Current long-equity value</div>
+      <div class="value">${fmtMoney(currentAUMEstimate)}</div>
+      <div class="delta">Commons only, @ ${FILING.pricesAsOf}</div>
+    </div>
+    <div class="stat">
+      <div class="label">Positions</div>
+      <div class="value small">${numLongs} long · ${numCalls} calls · ${numPuts} puts</div>
+      <div class="delta">${HOLDINGS.length} total entries</div>
+    </div>
+    <div class="stat">
+      <div class="label">Top-5 concentration</div>
+      <div class="value">${top5Concentration.toFixed(1)}%</div>
+      <div class="delta">${top5.map(h => h.ticker || h.issuer.slice(0,10)).join(' · ')}</div>
+    </div>
+    <div class="stat">
+      <div class="label">Largest position</div>
+      <div class="value small">${top5[0] ? top5[0].issuer : '—'}</div>
+      <div class="delta">${top5[0] ? fmtMoney(top5[0].latestValueUsd) + ' · ' + top5[0].pctPortfolio.toFixed(1) + '% of port' : ''}</div>
+    </div>
+  `;
+}
+renderSummary();
+window.__redrawSparklines = renderSummary;
+
+// ---- Diff panels ----
+const newBuys = HOLDINGS.filter(h => h.isNew).sort((a,b) => b.latestValueUsd - a.latestValueUsd);
+const sizeChanges = HOLDINGS
+  .filter(h => !h.isNew && h.qoqSharesPct != null && h.qoqSharesPct !== 0)
+  .sort((a,b) => Math.abs(b.qoqSharesPct) - Math.abs(a.qoqSharesPct))
+  .slice(0, 10);
+
+document.getElementById('buys-count').textContent = newBuys.length;
+document.getElementById('buys-list').innerHTML = newBuys.map(h =>
+  `<li><span class="name">${h.issuer} <span class="ticker">${h.ticker || h.cusip}</span>${pcTag(h.putCall)}</span><span class="amt">${fmtMoney(h.latestValueUsd)}</span></li>`
+).join('') || '<li style="color:var(--text-faint);">None</li>';
+
+document.getElementById('exits-count').textContent = EXITS.length;
+document.getElementById('exits-list').innerHTML = EXITS
+  .sort((a,b) => b.prior_value_usd - a.prior_value_usd)
+  .map(e => `<li><span class="name">${e.issuer} <span class="ticker">${e.ticker || e.cusip}</span>${pcTag(e.put_call)}</span><span class="amt">${fmtMoney(e.prior_value_usd)}</span></li>`)
+  .join('') || '<li style="color:var(--text-faint);">None</li>';
+
+document.getElementById('changes-count').textContent = sizeChanges.length;
+document.getElementById('changes-list').innerHTML = sizeChanges.map(h => {
+  const dir = h.qoqSharesPct >= 0 ? 'pos' : 'neg';
+  return `<li><span class="name">${h.issuer} <span class="ticker">${h.ticker || h.cusip}</span>${pcTag(h.putCall)}</span><span class="amt ${dir}">${fmtPct(h.qoqSharesPct)} shares</span></li>`;
+}).join('') || '<li style="color:var(--text-faint);">None</li>';
+
+// ---- Table ----
+const tbody = document.getElementById('tbody');
+let sortState = { key: 'latestValueUsd', dir: 'desc', type: 'num' };
+
+function renderTable() {
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const hideOptions = document.getElementById('hide-options').checked;
+  const hideShorts = document.getElementById('hide-shorts').checked;
+
+  let rows = [...HOLDINGS];
+  if (q) rows = rows.filter(h => h.issuer.toLowerCase().includes(q) || (h.ticker && h.ticker.toLowerCase().includes(q)));
+  if (hideOptions) rows = rows.filter(h => h.putCall == null);
+  if (hideShorts) rows = rows.filter(h => h.putCall !== 'Put');
+
+  rows.sort((a,b) => {
+    const va = a[sortState.key];
+    const vb = b[sortState.key];
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    let cmp;
+    if (sortState.type === 'num') cmp = va - vb;
+    else cmp = String(va).localeCompare(String(vb));
+    return sortState.dir === 'asc' ? cmp : -cmp;
+  });
+
+  document.getElementById('row-count').textContent = `${rows.length} of ${HOLDINGS.length} rows`;
+
+  tbody.innerHTML = rows.map(h => {
+    const typeLabel = h.putCall
+      ? `<span class="pc-tag ${h.putCall === 'Call' ? 'pc-call' : 'pc-put'}">${h.putCall.toUpperCase()}</span>`
+      : '<span style="color:var(--text-faint);font-size:11px;">Long</span>';
+    const flagIcon = h.flag ? `<span class="flag" title="${h.flag.replace(/"/g,'&quot;')}">⚠</span>` : '';
+    const qoqDisplay = h.isNew
+      ? '<span class="pos">NEW</span>'
+      : (h.qoqSharesPct == null ? '—' : `<span class="${clsReturn(h.qoqSharesPct)}">${fmtPct(h.qoqSharesPct)}</span>`);
+    return `
+      <tr class="${h.putCall ? 'option-row' : ''}">
+        <td class="name-cell">${h.issuer} <span class="ticker">${h.ticker || h.cusip}</span> ${flagIcon}</td>
+        <td>${typeLabel}</td>
+        <td class="num">${fmtMoney(h.latestValueUsd)}</td>
+        <td class="num">${fmtPctClean(h.pctPortfolio)}</td>
+        <td class="num">${fmtShares(h.latestShares)}</td>
+        <td class="num">${fmtPx(h.qEndPrice)}</td>
+        <td class="num">${fmtPx(h.entryPrice)}</td>
+        <td class="num">${fmtPx(h.currentPrice)}</td>
+        <td class="num">${fmtMoney(h.currentValueUsd)}</td>
+        <td class="num ${clsReturn(h.estReturnPct)}">${fmtPct(h.estReturnPct)}</td>
+        <td class="num">${qoqDisplay}</td>
+      </tr>
+    `;
+  }).join('');
+
+  document.querySelectorAll('#table th').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.sort === sortState.key) {
+      th.classList.add(sortState.dir === 'asc' ? 'sort-asc' : 'sort-desc');
+      th.querySelector('.arrow').textContent = sortState.dir === 'asc' ? '▲' : '▼';
+    } else {
+      th.querySelector('.arrow').textContent = '↕';
+    }
+  });
+}
+
+document.querySelectorAll('#table th').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    const type = th.dataset.type;
+    if (sortState.key === key) sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+    else { sortState.key = key; sortState.type = type; sortState.dir = type === 'num' ? 'desc' : 'asc'; }
+    renderTable();
+  });
+});
+
+document.getElementById('search').addEventListener('input', renderTable);
+document.getElementById('hide-options').addEventListener('change', renderTable);
+document.getElementById('hide-shorts').addEventListener('change', renderTable);
+
+renderTable();
+
+// ---- Signup form ----
+(function() {
+  const form = document.getElementById('signup-form');
+  const status = document.getElementById('signup-status');
+  const submit = document.getElementById('signup-submit');
+  const input = document.getElementById('signup-email');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = input.value.trim();
+    if (!email) return;
+    submit.disabled = true;
+    status.className = 'status'; status.textContent = 'Subscribing…';
+    try {
+      const resp = await fetch("https://example.com/subscribe", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      status.className = 'status ok';
+      status.textContent = 'Subscribed — check your inbox to confirm.';
+      input.value = '';
+    } catch (err) {
+      status.className = 'status err';
+      status.textContent = 'Something went wrong. Try again in a moment.';
+    } finally {
+      submit.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>

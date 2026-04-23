@@ -1,0 +1,87 @@
+name: Weekly 13F check
+
+on:
+  schedule:
+    # Monday 13:00 UTC = 9am ET / 6am PT. Cron can run a few minutes late — that's fine.
+    - cron: "0 13 * * 1"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Regenerate dashboard even if no new filing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write        # commit updated dashboard + state
+  issues: write          # file an issue when a new filing is detected
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install deps
+        run: |
+          pip install -e .
+
+      - name: Run tracker
+        id: run
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_EMAIL_FROM: ${{ secrets.ALERT_EMAIL_FROM }}
+          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+          SITE_NAME: ${{ vars.SITE_NAME }}
+          SITE_URL: ${{ vars.SITE_URL }}
+          OG_IMAGE_URL: ${{ vars.OG_IMAGE_URL }}
+          REPO_URL: ${{ vars.REPO_URL }}
+          SIGNUP_ENDPOINT: ${{ vars.SIGNUP_ENDPOINT }}
+        run: |
+          FLAGS=""
+          if [ "${{ inputs.force }}" = "true" ]; then FLAGS="--force"; fi
+          python run.py $FLAGS 2>&1 | tee tracker.log
+          # Surface whether a new filing was written so later steps can act on it.
+          if grep -q "Diff summary:" tracker.log; then
+            echo "new_filing=true" >> "$GITHUB_OUTPUT"
+            awk '/^Diff summary:/{flag=1; next} flag' tracker.log > diff_summary.txt
+          else
+            echo "new_filing=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit updated dashboard and state
+        run: |
+          git config user.name "13f-tracker-bot"
+          git config user.email "13f-tracker-bot@users.noreply.github.com"
+          git add docs/index.html data/state.json data/cusip_tickers.json data/aum_history.json 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            if [ "${{ steps.run.outputs.new_filing }}" = "true" ]; then
+              MSG="Update: new 13F filing detected"
+            else
+              MSG="Update: refresh prices"
+            fi
+            git commit -m "$MSG"
+            git push
+          fi
+
+      - name: File GitHub Issue on new filing
+        if: steps.run.outputs.new_filing == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('diff_summary.txt', 'utf8');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'New 13F filing detected',
+              body: '```\n' + body + '\n```',
+              labels: ['new-filing']
+            });

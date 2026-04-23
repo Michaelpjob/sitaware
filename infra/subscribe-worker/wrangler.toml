@@ -1,0 +1,14 @@
+name = "subscribe-worker"
+main = "src/worker.js"
+compatibility_date = "2025-01-01"
+
+# Non-secret config. Secrets (RESEND_API_KEY, RESEND_AUDIENCE_ID) are set with
+# `wrangler secret put` — never commit those to git.
+[vars]
+# Comma-separated list of Origin header values allowed to call this endpoint.
+# Include your custom domain and the github.io URL (as a fallback while DNS propagates).
+ALLOWED_ORIGIN = "https://tracker.example.com,https://yourname.github.io"
+
+# Uncomment after you add a custom domain in the Cloudflare dashboard or via
+# `wrangler deploy --route 'subscribe.tracker.example.com/*'`.
+# routes = [{ pattern = "subscribe.tracker.example.com/*", custom_domain = true }]
