@@ -1,4 +1,8 @@
-"""Render the dashboard HTML from a DashboardPayload using Jinja2."""
+"""Render the dashboard HTML from one or more DashboardPayloads.
+
+The template supports a multi-fund view: all fund payloads are embedded as JSON
+and a dropdown in the header swaps which one is displayed.
+"""
 from __future__ import annotations
 
 import json
@@ -9,6 +13,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from src.compute import AumHistoryPoint, DashboardPayload
+from src.funds import Fund
 
 
 def _env() -> Environment:
@@ -22,44 +27,7 @@ def _env() -> Environment:
     return env
 
 
-def render_dashboard(
-    payload: DashboardPayload,
-    aum_history: list[AumHistoryPoint] | None = None,
-    site_name: str | None = None,
-    site_url: str | None = None,
-    og_image_url: str | None = None,
-    repo_url: str | None = None,
-    signup_endpoint: str | None = None,
-) -> str:
-    """Render HTML. Optional site/branding/signup hooks come from env or kwargs."""
-    env = _env()
-    tmpl = env.get_template("dashboard.html.j2")
-
-    positions_json = [_position_as_dict(p) for p in payload.positions]
-    exits_json = [asdict(e) for e in payload.exits]
-    history_json = [asdict(p) for p in (aum_history or [])]
-
-    return tmpl.render(
-        filer_name=payload.filer_name,
-        cik=payload.cik,
-        latest=payload.latest,
-        prior=payload.prior,
-        latest_total_usd=payload.latest_total_usd,
-        prior_total_usd=payload.prior_total_usd,
-        prices_as_of=payload.prices_as_of,
-        positions_json=json.dumps(positions_json),
-        exits_json=json.dumps(exits_json),
-        aum_history_json=json.dumps(history_json),
-        site_name=site_name or os.environ.get("SITE_NAME") or None,
-        site_url=site_url or os.environ.get("SITE_URL") or None,
-        og_image_url=og_image_url or os.environ.get("OG_IMAGE_URL") or None,
-        repo_url=repo_url or os.environ.get("REPO_URL") or None,
-        signup_endpoint=signup_endpoint or os.environ.get("SIGNUP_ENDPOINT") or None,
-    )
-
-
 def _position_as_dict(p) -> dict:
-    """Convert an EnrichedPosition to a JSON-serializable dict."""
     return {
         "issuer": p.issuer,
         "ticker": p.ticker,
@@ -82,12 +50,75 @@ def _position_as_dict(p) -> dict:
     }
 
 
+def _fund_blob(fund: Fund, payload: DashboardPayload, history: list[AumHistoryPoint]) -> dict:
+    """Serialize one fund's payload for embedding in the HTML."""
+    return {
+        "slug": fund.slug,
+        "name": fund.name,
+        "manager": fund.manager,
+        "cik": fund.cik,
+        "latest": {
+            "accession": payload.latest.accession,
+            "filing_date": payload.latest.filing_date,
+            "period_of_report": payload.latest.period_of_report,
+        },
+        "prior": (
+            {
+                "accession": payload.prior.accession,
+                "filing_date": payload.prior.filing_date,
+                "period_of_report": payload.prior.period_of_report,
+            }
+            if payload.prior
+            else None
+        ),
+        "latestTotalUsd": payload.latest_total_usd,
+        "priorTotalUsd": payload.prior_total_usd,
+        "positions": [_position_as_dict(p) for p in payload.positions],
+        "exits": [asdict(e) for e in payload.exits],
+        "aumHistory": [asdict(p) for p in (history or [])],
+    }
+
+
+def render_dashboard(
+    funds_data: list[tuple[Fund, DashboardPayload, list[AumHistoryPoint]]],
+    prices_as_of: str,
+    active_slug: str | None = None,
+    site_name: str | None = None,
+    site_url: str | None = None,
+    og_image_url: str | None = None,
+    repo_url: str | None = None,
+    signup_endpoint: str | None = None,
+) -> str:
+    """Render HTML. funds_data is a list of (Fund, payload, aum_history) tuples —
+    one per fund. The first entry (or one matching active_slug) is shown by default.
+    """
+    if not funds_data:
+        raise ValueError("render_dashboard: funds_data must not be empty")
+
+    env = _env()
+    tmpl = env.get_template("dashboard.html.j2")
+
+    blobs = [_fund_blob(f, p, h) for (f, p, h) in funds_data]
+    active = active_slug or funds_data[0][0].slug
+
+    return tmpl.render(
+        funds_json=json.dumps(blobs),
+        active_slug=active,
+        prices_as_of=prices_as_of,
+        site_name=site_name or os.environ.get("SITE_NAME") or None,
+        site_url=site_url or os.environ.get("SITE_URL") or None,
+        og_image_url=og_image_url or os.environ.get("OG_IMAGE_URL") or None,
+        repo_url=repo_url or os.environ.get("REPO_URL") or None,
+        signup_endpoint=signup_endpoint or os.environ.get("SIGNUP_ENDPOINT") or None,
+    )
+
+
 def write_dashboard(
-    payload: DashboardPayload,
-    aum_history: list[AumHistoryPoint] | None = None,
+    funds_data: list[tuple[Fund, DashboardPayload, list[AumHistoryPoint]]],
+    prices_as_of: str,
     out_path: Path = Path("docs/index.html"),
     **kwargs,
 ) -> None:
-    html = render_dashboard(payload, aum_history=aum_history, **kwargs)
+    html = render_dashboard(funds_data, prices_as_of=prices_as_of, **kwargs)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(html, encoding="utf-8")

@@ -3,21 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ filer_name }} — 13F Tracker</title>
-<meta name="description" content="A weekly-updated dashboard tracking {{ filer_name }}'s public 13F filings: positions, estimated returns, and quarter-over-quarter changes.">
+<title>{{ site_name or 'Fundwatch' }} — 13F Tracker</title>
+<meta name="description" content="Weekly-updated dashboards tracking public 13F filings: positions, estimated returns, and quarter-over-quarter changes.">
 
 {# Social / Open Graph #}
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="{{ site_name or '13F Tracker' }}">
-<meta property="og:title" content="{{ filer_name }} — 13F Portfolio Tracker">
-<meta property="og:description" content="Tracking {{ filer_name }}'s 13F filings: positions, returns, and QoQ changes. Updated weekly from SEC EDGAR.">
+<meta property="og:site_name" content="{{ site_name or 'Fundwatch' }}">
+<meta property="og:title" content="{{ site_name or 'Fundwatch' }} — 13F Portfolio Tracker">
+<meta property="og:description" content="Weekly-updated dashboards tracking hedge fund 13F filings from SEC EDGAR.">
 {% if site_url %}<meta property="og:url" content="{{ site_url }}">{% endif %}
 {% if og_image_url %}<meta property="og:image" content="{{ og_image_url }}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">{% endif %}
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="{{ filer_name }} — 13F Portfolio Tracker">
-<meta name="twitter:description" content="Weekly-updated dashboard of {{ filer_name }}'s public 13F filings.">
+<meta name="twitter:title" content="{{ site_name or 'Fundwatch' }} — 13F Portfolio Tracker">
+<meta name="twitter:description" content="Weekly-updated 13F dashboards.">
 {% if og_image_url %}<meta name="twitter:image" content="{{ og_image_url }}">{% endif %}
 
 {# Favicon — inline SVG so no extra asset to host #}
@@ -105,7 +105,33 @@
   /* Header */
   .top-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
   .top-bar .brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
-  .top-bar h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Fund picker — clickable h1 that opens a dropdown */
+  .fund-picker { position: relative; }
+  .fund-picker button.fund-btn {
+    background: none; border: none; color: var(--text); cursor: pointer;
+    font: inherit; font-size: 22px; font-weight: 600; letter-spacing: -0.01em;
+    padding: 4px 10px 4px 0; margin: 0; display: inline-flex; align-items: center; gap: 6px;
+    border-radius: 6px; transition: background 0.12s;
+  }
+  .fund-picker button.fund-btn:hover { background: var(--surface-alt); }
+  .fund-picker button.fund-btn .chev { color: var(--text-muted); font-size: 13px; transition: transform 0.12s; }
+  .fund-picker.open button.fund-btn .chev { transform: rotate(180deg); }
+  .fund-menu {
+    display: none; position: absolute; top: calc(100% + 4px); left: 0;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: var(--shadow-md); z-index: 20; min-width: 260px; padding: 4px;
+  }
+  .fund-picker.open .fund-menu { display: block; }
+  .fund-menu button.fund-item {
+    display: block; width: 100%; text-align: left; background: none; border: none;
+    color: var(--text); padding: 8px 12px; border-radius: 5px; cursor: pointer; font: inherit;
+  }
+  .fund-menu button.fund-item:hover { background: var(--surface-hover); }
+  .fund-menu button.fund-item.active { background: var(--surface-alt); }
+  .fund-menu .fund-item .primary { font-size: 14px; font-weight: 500; }
+  .fund-menu .fund-item .secondary { display: block; font-size: 11px; color: var(--text-faint); margin-top: 1px; }
+
   .top-bar .tag { color: var(--text-faint); font-size: 13px; font-weight: 400; white-space: nowrap; }
   .top-bar .actions { display: flex; align-items: center; gap: 8px; }
   .icon-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background 0.12s, color 0.12s; }
@@ -193,7 +219,7 @@
     .summary { grid-template-columns: repeat(2, 1fr); }
     .diff-grid { grid-template-columns: 1fr; }
     .wrap { padding: 14px; }
-    .top-bar h1 { font-size: 18px; }
+    .fund-picker button.fund-btn { font-size: 18px; }
     .top-bar .tag { display: none; }
   }
 </style>
@@ -203,8 +229,14 @@
 
 <div class="top-bar">
   <div class="brand">
-    <h1>{{ filer_name }}</h1>
-    <span class="tag">— 13F Portfolio Tracker</span>
+    <div class="fund-picker" id="fund-picker">
+      <button class="fund-btn" id="fund-btn" type="button" aria-haspopup="menu" aria-expanded="false">
+        <span id="fund-name"></span>
+        <span class="chev">▾</span>
+      </button>
+      <div class="fund-menu" id="fund-menu" role="menu"></div>
+    </div>
+    <span class="tag" id="fund-tag">— 13F Portfolio Tracker</span>
   </div>
   <div class="actions">
     <button class="icon-btn" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">
@@ -214,11 +246,7 @@
   </div>
 </div>
 
-<div class="sub">
-  CIK <a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={{ cik }}&type=13F&dateb=&owner=include&count=40" target="_blank" rel="noopener">{{ cik }}</a>
-  · Latest filing: {{ latest.filing_date }} for period {{ latest.period_of_report }}
-  · Accession: <code>{{ latest.accession }}</code>
-</div>
+<div class="sub" id="sub-line"></div>
 
 <div class="summary" id="summary"></div>
 
@@ -267,7 +295,7 @@
 <div class="signup">
   <div class="pitch">
     <h4>Get notified when a new 13F drops</h4>
-    <p>One email per quarter when {{ filer_name }} files with the SEC. No spam, unsubscribe anytime.</p>
+    <p>One email per quarter when any tracked fund files with the SEC. No spam, unsubscribe anytime.</p>
   </div>
   <form id="signup-form">
     <input type="email" name="email" id="signup-email" placeholder="you@example.com" required autocomplete="email">
@@ -278,20 +306,18 @@
 {% endif %}
 
 <footer>
-  <div><strong>Data source:</strong> SEC EDGAR 13F-HR filings. Latest period: {{ latest.period_of_report }} (filed {{ latest.filing_date }}).{% if prior %} Prior period: {{ prior.period_of_report }} (filed {{ prior.filing_date }}).{% endif %} Current prices as of {{ prices_as_of }}.</div>
-  <div style="margin-top:6px;"><strong>Methodology:</strong> 13Fs are filed quarterly with a ~45-day lag and show long U.S. equity and option positions only — they don't show short common-stock positions, fixed-income, non-U.S. listings, or private holdings. "Value" and shares are as reported. "Q-end Px" is derived from value ÷ shares. "Est. entry" uses the quarterly mean daily close for the first quarter the position appeared — a proxy for VWAP. "Est. return" compares current price to the entry proxy and does NOT reflect actual fills or costs paid. Returns on option rows show % change in underlying reference price, not option P&L (option premiums aren't disclosed in 13Fs).</div>
+  <div><strong>Data source:</strong> SEC EDGAR 13F-HR filings. Current prices as of {{ prices_as_of }}.</div>
+  <div style="margin-top:6px;"><strong>Methodology:</strong> 13Fs are filed quarterly with a ~45-day lag and show long U.S. equity and option positions only — they don't show short common-stock positions, fixed-income, non-U.S. listings, or private holdings. "Value" and shares are as reported. "Q-end Px" is derived from value ÷ shares. "Est. entry" uses the quarterly mean daily close for the first quarter the position appeared — a proxy for VWAP. "Est. return" compares current price to the entry proxy and does NOT reflect actual fills or costs paid. Returns on option rows show % change in underlying reference price, not option P&L.</div>
   <div style="margin-top:6px;"><strong>Not investment advice.</strong> This is a tool to observe public filings, not a recommendation to buy or sell anything.</div>
   <div style="margin-top:10px;"><strong>Generated:</strong> {{ prices_as_of }}{% if repo_url %} · <a href="{{ repo_url }}">Open source on GitHub</a>{% endif %}</div>
 </footer>
 
 </div>
 
-<script id="payload-data" type="application/json">{{ positions_json|safe }}</script>
-<script id="exits-data" type="application/json">{{ exits_json|safe }}</script>
-<script id="aum-history-data" type="application/json">{{ aum_history_json|safe }}</script>
+<script id="funds-data" type="application/json">{{ funds_json|safe }}</script>
 
 <script>
-// ---- Theme toggle (auto / light / dark) ----
+// ---- Theme toggle ----
 (function() {
   const root = document.documentElement;
   const btn = document.getElementById('theme-toggle');
@@ -304,20 +330,17 @@
   btn.addEventListener('click', () => {
     const cur = root.getAttribute('data-theme');
     apply(modes[(modes.indexOf(cur) + 1) % modes.length]);
-    if (window.__redrawSparklines) window.__redrawSparklines();
   });
 })();
 
 // ---- Data ----
-const HOLDINGS = JSON.parse(document.getElementById('payload-data').textContent);
-const EXITS = JSON.parse(document.getElementById('exits-data').textContent);
-const AUM_HISTORY = JSON.parse(document.getElementById('aum-history-data').textContent || '[]');
+const FUNDS = JSON.parse(document.getElementById('funds-data').textContent);
+const FUNDS_BY_SLUG = Object.fromEntries(FUNDS.map(f => [f.slug, f]));
+const PRICES_AS_OF = {{ prices_as_of|tojson }};
 
-const FILING = {
-  latestTotalValue: {{ latest_total_usd }},
-  priorTotalValue: {{ prior_total_usd if prior_total_usd is not none else 'null' }},
-  pricesAsOf: {{ prices_as_of|tojson }}
-};
+const urlFund = new URLSearchParams(location.search).get('fund');
+const storedFund = localStorage.getItem('activeFund');
+let active = FUNDS_BY_SLUG[urlFund] || FUNDS_BY_SLUG[storedFund] || FUNDS_BY_SLUG['{{ active_slug }}'] || FUNDS[0];
 
 // ---- Format helpers ----
 const fmtMoney = n => {
@@ -338,12 +361,9 @@ const fmtPctClean = n => n == null ? '—' : n.toFixed(1) + '%';
 const clsReturn = n => n == null ? 'muted' : (n >= 0 ? 'pos' : 'neg');
 const pcTag = pc => pc ? `<span class="pc-tag ${pc === 'Call' ? 'pc-call' : 'pc-put'}">${pc.toUpperCase()}</span>` : '';
 
-// ---- Sparkline renderer (vanilla SVG) ----
-function sparkline(values, opts = {}) {
+function sparkline(values) {
   if (!values || values.length < 2) return '';
-  const w = opts.width || 120;
-  const h = opts.height || 28;
-  const pad = 2;
+  const w = 120, h = 28, pad = 2;
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
@@ -355,10 +375,9 @@ function sparkline(values, opts = {}) {
   });
   const lastX = pad + (values.length - 1) * step;
   const lastY = h - pad - ((values[values.length - 1] - min) / range) * (h - pad * 2);
-  const strokeColor = values[values.length - 1] >= values[0]
-    ? 'var(--pos)' : 'var(--neg)';
-  const fillColor = values[values.length - 1] >= values[0]
-    ? 'var(--pos-bg)' : 'var(--neg-bg)';
+  const up = values[values.length - 1] >= values[0];
+  const strokeColor = up ? 'var(--pos)' : 'var(--neg)';
+  const fillColor = up ? 'var(--pos-bg)' : 'var(--neg-bg)';
   const areaPts = [`${pad},${h - pad}`, ...pts, `${lastX.toFixed(1)},${h - pad}`].join(' ');
   return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="none" style="overflow:visible">
     <polygon points="${areaPts}" fill="${fillColor}" opacity="0.5"/>
@@ -367,29 +386,73 @@ function sparkline(values, opts = {}) {
   </svg>`;
 }
 
-// ---- Summary ----
-const latestAUM = FILING.latestTotalValue;
-const priorAUM = FILING.priorTotalValue;
-const aumDelta = priorAUM ? ((latestAUM - priorAUM) / priorAUM) * 100 : null;
+// ---- Fund picker menu ----
+const picker = document.getElementById('fund-picker');
+const pickerBtn = document.getElementById('fund-btn');
+const pickerMenu = document.getElementById('fund-menu');
 
-const currentAUMEstimate = HOLDINGS
-  .filter(h => h.currentValueUsd != null && h.putCall == null)
-  .reduce((s, h) => s + h.currentValueUsd, 0);
+function buildFundMenu() {
+  pickerMenu.innerHTML = FUNDS.map(f => `
+    <button class="fund-item ${f.slug === active.slug ? 'active' : ''}" data-slug="${f.slug}" role="menuitem">
+      <span class="primary">${f.name}</span>
+      <span class="secondary">${f.manager} · CIK ${f.cik}</span>
+    </button>`).join('');
+  pickerMenu.querySelectorAll('button.fund-item').forEach(b => {
+    b.addEventListener('click', () => { setActive(b.dataset.slug); closeMenu(); });
+  });
+}
+function openMenu() { picker.classList.add('open'); pickerBtn.setAttribute('aria-expanded', 'true'); }
+function closeMenu() { picker.classList.remove('open'); pickerBtn.setAttribute('aria-expanded', 'false'); }
+pickerBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  picker.classList.contains('open') ? closeMenu() : openMenu();
+});
+document.addEventListener('click', (e) => { if (!picker.contains(e.target)) closeMenu(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
 
-const top5 = [...HOLDINGS].sort((a,b) => b.latestValueUsd - a.latestValueUsd).slice(0,5);
-const top5Concentration = top5.reduce((s,h) => s + h.pctPortfolio, 0);
+function setActive(slug) {
+  const next = FUNDS_BY_SLUG[slug];
+  if (!next) return;
+  active = next;
+  localStorage.setItem('activeFund', slug);
+  // Update URL without reloading (nice for sharing a link to a specific fund).
+  const u = new URL(location.href);
+  u.searchParams.set('fund', slug);
+  history.replaceState({}, '', u);
+  renderAll();
+}
 
-const numLongs = HOLDINGS.filter(h => h.putCall == null).length;
-const numCalls = HOLDINGS.filter(h => h.putCall === 'Call').length;
-const numPuts  = HOLDINGS.filter(h => h.putCall === 'Put').length;
-
-// AUM sparkline needs history (values oldest-first).
-const aumSeries = AUM_HISTORY.map(p => p.total_usd);
-const aumSparkHtml = aumSeries.length >= 2
-  ? `<div class="sparkline" title="${AUM_HISTORY.map(p => p.period + ': ' + fmtMoney(p.total_usd)).join(' · ')}">${sparkline(aumSeries)}</div>`
-  : '';
+// ---- Render helpers ----
+function renderHeader() {
+  document.getElementById('fund-name').textContent = active.name;
+  document.getElementById('fund-tag').textContent = '— 13F · ' + active.manager;
+  document.title = active.name + ' — 13F Tracker';
+  const sub = document.getElementById('sub-line');
+  const accession = active.latest.accession;
+  const filingDate = active.latest.filing_date;
+  const period = active.latest.period_of_report;
+  sub.innerHTML =
+    `CIK <a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${active.cik}&type=13F&dateb=&owner=include&count=40" target="_blank" rel="noopener">${active.cik}</a>
+     · Latest filing: ${filingDate} for period ${period}
+     · Accession: <code>${accession}</code>`;
+}
 
 function renderSummary() {
+  const h = active.positions;
+  const latestAUM = active.latestTotalUsd;
+  const priorAUM = active.priorTotalUsd;
+  const aumDelta = priorAUM ? ((latestAUM - priorAUM) / priorAUM) * 100 : null;
+  const currentAUMEstimate = h.filter(x => x.currentValueUsd != null && x.putCall == null).reduce((s, x) => s + x.currentValueUsd, 0);
+  const top5 = [...h].sort((a,b) => b.latestValueUsd - a.latestValueUsd).slice(0,5);
+  const top5Conc = top5.reduce((s,x) => s + x.pctPortfolio, 0);
+  const numLongs = h.filter(x => x.putCall == null).length;
+  const numCalls = h.filter(x => x.putCall === 'Call').length;
+  const numPuts  = h.filter(x => x.putCall === 'Put').length;
+  const aumSeries = active.aumHistory.map(p => p.total_usd);
+  const aumSparkHtml = aumSeries.length >= 2
+    ? `<div class="sparkline" title="${active.aumHistory.map(p => p.period + ': ' + fmtMoney(p.total_usd)).join(' · ')}">${sparkline(aumSeries)}</div>`
+    : '';
+
   document.getElementById('summary').innerHTML = `
     <div class="stat">
       <div class="label">Reported AUM (latest)</div>
@@ -400,17 +463,17 @@ function renderSummary() {
     <div class="stat">
       <div class="label">Current long-equity value</div>
       <div class="value">${fmtMoney(currentAUMEstimate)}</div>
-      <div class="delta">Commons only, @ ${FILING.pricesAsOf}</div>
+      <div class="delta">Commons only, @ ${PRICES_AS_OF}</div>
     </div>
     <div class="stat">
       <div class="label">Positions</div>
       <div class="value small">${numLongs} long · ${numCalls} calls · ${numPuts} puts</div>
-      <div class="delta">${HOLDINGS.length} total entries</div>
+      <div class="delta">${h.length} total entries</div>
     </div>
     <div class="stat">
       <div class="label">Top-5 concentration</div>
-      <div class="value">${top5Concentration.toFixed(1)}%</div>
-      <div class="delta">${top5.map(h => h.ticker || h.issuer.slice(0,10)).join(' · ')}</div>
+      <div class="value">${top5Conc.toFixed(1)}%</div>
+      <div class="delta">${top5.map(x => x.ticker || x.issuer.slice(0,10)).join(' · ')}</div>
     </div>
     <div class="stat">
       <div class="label">Largest position</div>
@@ -419,32 +482,33 @@ function renderSummary() {
     </div>
   `;
 }
-renderSummary();
-window.__redrawSparklines = renderSummary;
 
-// ---- Diff panels ----
-const newBuys = HOLDINGS.filter(h => h.isNew).sort((a,b) => b.latestValueUsd - a.latestValueUsd);
-const sizeChanges = HOLDINGS
-  .filter(h => !h.isNew && h.qoqSharesPct != null && h.qoqSharesPct !== 0)
-  .sort((a,b) => Math.abs(b.qoqSharesPct) - Math.abs(a.qoqSharesPct))
-  .slice(0, 10);
+function renderDiffs() {
+  const h = active.positions;
+  const e = active.exits;
+  const newBuys = h.filter(x => x.isNew).sort((a,b) => b.latestValueUsd - a.latestValueUsd);
+  const sizeChanges = h
+    .filter(x => !x.isNew && x.qoqSharesPct != null && x.qoqSharesPct !== 0)
+    .sort((a,b) => Math.abs(b.qoqSharesPct) - Math.abs(a.qoqSharesPct))
+    .slice(0, 10);
 
-document.getElementById('buys-count').textContent = newBuys.length;
-document.getElementById('buys-list').innerHTML = newBuys.map(h =>
-  `<li><span class="name">${h.issuer} <span class="ticker">${h.ticker || h.cusip}</span>${pcTag(h.putCall)}</span><span class="amt">${fmtMoney(h.latestValueUsd)}</span></li>`
-).join('') || '<li style="color:var(--text-faint);">None</li>';
+  document.getElementById('buys-count').textContent = newBuys.length;
+  document.getElementById('buys-list').innerHTML = newBuys.map(x =>
+    `<li><span class="name">${x.issuer} <span class="ticker">${x.ticker || x.cusip}</span>${pcTag(x.putCall)}</span><span class="amt">${fmtMoney(x.latestValueUsd)}</span></li>`
+  ).join('') || '<li style="color:var(--text-faint);">None</li>';
 
-document.getElementById('exits-count').textContent = EXITS.length;
-document.getElementById('exits-list').innerHTML = EXITS
-  .sort((a,b) => b.prior_value_usd - a.prior_value_usd)
-  .map(e => `<li><span class="name">${e.issuer} <span class="ticker">${e.ticker || e.cusip}</span>${pcTag(e.put_call)}</span><span class="amt">${fmtMoney(e.prior_value_usd)}</span></li>`)
-  .join('') || '<li style="color:var(--text-faint);">None</li>';
+  document.getElementById('exits-count').textContent = e.length;
+  document.getElementById('exits-list').innerHTML = [...e]
+    .sort((a,b) => b.prior_value_usd - a.prior_value_usd)
+    .map(x => `<li><span class="name">${x.issuer} <span class="ticker">${x.ticker || x.cusip}</span>${pcTag(x.put_call)}</span><span class="amt">${fmtMoney(x.prior_value_usd)}</span></li>`)
+    .join('') || '<li style="color:var(--text-faint);">None</li>';
 
-document.getElementById('changes-count').textContent = sizeChanges.length;
-document.getElementById('changes-list').innerHTML = sizeChanges.map(h => {
-  const dir = h.qoqSharesPct >= 0 ? 'pos' : 'neg';
-  return `<li><span class="name">${h.issuer} <span class="ticker">${h.ticker || h.cusip}</span>${pcTag(h.putCall)}</span><span class="amt ${dir}">${fmtPct(h.qoqSharesPct)} shares</span></li>`;
-}).join('') || '<li style="color:var(--text-faint);">None</li>';
+  document.getElementById('changes-count').textContent = sizeChanges.length;
+  document.getElementById('changes-list').innerHTML = sizeChanges.map(x => {
+    const dir = x.qoqSharesPct >= 0 ? 'pos' : 'neg';
+    return `<li><span class="name">${x.issuer} <span class="ticker">${x.ticker || x.cusip}</span>${pcTag(x.putCall)}</span><span class="amt ${dir}">${fmtPct(x.qoqSharesPct)} shares</span></li>`;
+  }).join('') || '<li style="color:var(--text-faint);">None</li>';
+}
 
 // ---- Table ----
 const tbody = document.getElementById('tbody');
@@ -455,10 +519,10 @@ function renderTable() {
   const hideOptions = document.getElementById('hide-options').checked;
   const hideShorts = document.getElementById('hide-shorts').checked;
 
-  let rows = [...HOLDINGS];
-  if (q) rows = rows.filter(h => h.issuer.toLowerCase().includes(q) || (h.ticker && h.ticker.toLowerCase().includes(q)));
-  if (hideOptions) rows = rows.filter(h => h.putCall == null);
-  if (hideShorts) rows = rows.filter(h => h.putCall !== 'Put');
+  let rows = [...active.positions];
+  if (q) rows = rows.filter(x => x.issuer.toLowerCase().includes(q) || (x.ticker && x.ticker.toLowerCase().includes(q)));
+  if (hideOptions) rows = rows.filter(x => x.putCall == null);
+  if (hideShorts) rows = rows.filter(x => x.putCall !== 'Put');
 
   rows.sort((a,b) => {
     const va = a[sortState.key];
@@ -472,28 +536,28 @@ function renderTable() {
     return sortState.dir === 'asc' ? cmp : -cmp;
   });
 
-  document.getElementById('row-count').textContent = `${rows.length} of ${HOLDINGS.length} rows`;
+  document.getElementById('row-count').textContent = `${rows.length} of ${active.positions.length} rows`;
 
-  tbody.innerHTML = rows.map(h => {
-    const typeLabel = h.putCall
-      ? `<span class="pc-tag ${h.putCall === 'Call' ? 'pc-call' : 'pc-put'}">${h.putCall.toUpperCase()}</span>`
+  tbody.innerHTML = rows.map(x => {
+    const typeLabel = x.putCall
+      ? `<span class="pc-tag ${x.putCall === 'Call' ? 'pc-call' : 'pc-put'}">${x.putCall.toUpperCase()}</span>`
       : '<span style="color:var(--text-faint);font-size:11px;">Long</span>';
-    const flagIcon = h.flag ? `<span class="flag" title="${h.flag.replace(/"/g,'&quot;')}">⚠</span>` : '';
-    const qoqDisplay = h.isNew
+    const flagIcon = x.flag ? `<span class="flag" title="${x.flag.replace(/"/g,'&quot;')}">⚠</span>` : '';
+    const qoqDisplay = x.isNew
       ? '<span class="pos">NEW</span>'
-      : (h.qoqSharesPct == null ? '—' : `<span class="${clsReturn(h.qoqSharesPct)}">${fmtPct(h.qoqSharesPct)}</span>`);
+      : (x.qoqSharesPct == null ? '—' : `<span class="${clsReturn(x.qoqSharesPct)}">${fmtPct(x.qoqSharesPct)}</span>`);
     return `
-      <tr class="${h.putCall ? 'option-row' : ''}">
-        <td class="name-cell">${h.issuer} <span class="ticker">${h.ticker || h.cusip}</span> ${flagIcon}</td>
+      <tr class="${x.putCall ? 'option-row' : ''}">
+        <td class="name-cell">${x.issuer} <span class="ticker">${x.ticker || x.cusip}</span> ${flagIcon}</td>
         <td>${typeLabel}</td>
-        <td class="num">${fmtMoney(h.latestValueUsd)}</td>
-        <td class="num">${fmtPctClean(h.pctPortfolio)}</td>
-        <td class="num">${fmtShares(h.latestShares)}</td>
-        <td class="num">${fmtPx(h.qEndPrice)}</td>
-        <td class="num">${fmtPx(h.entryPrice)}</td>
-        <td class="num">${fmtPx(h.currentPrice)}</td>
-        <td class="num">${fmtMoney(h.currentValueUsd)}</td>
-        <td class="num ${clsReturn(h.estReturnPct)}">${fmtPct(h.estReturnPct)}</td>
+        <td class="num">${fmtMoney(x.latestValueUsd)}</td>
+        <td class="num">${fmtPctClean(x.pctPortfolio)}</td>
+        <td class="num">${fmtShares(x.latestShares)}</td>
+        <td class="num">${fmtPx(x.qEndPrice)}</td>
+        <td class="num">${fmtPx(x.entryPrice)}</td>
+        <td class="num">${fmtPx(x.currentPrice)}</td>
+        <td class="num">${fmtMoney(x.currentValueUsd)}</td>
+        <td class="num ${clsReturn(x.estReturnPct)}">${fmtPct(x.estReturnPct)}</td>
         <td class="num">${qoqDisplay}</td>
       </tr>
     `;
@@ -524,7 +588,14 @@ document.getElementById('search').addEventListener('input', renderTable);
 document.getElementById('hide-options').addEventListener('change', renderTable);
 document.getElementById('hide-shorts').addEventListener('change', renderTable);
 
-renderTable();
+function renderAll() {
+  renderHeader();
+  buildFundMenu();
+  renderSummary();
+  renderDiffs();
+  renderTable();
+}
+renderAll();
 
 {% if signup_endpoint %}
 // ---- Signup form ----
@@ -547,7 +618,7 @@ renderTable();
       });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       status.className = 'status ok';
-      status.textContent = 'Subscribed — check your inbox to confirm.';
+      status.textContent = 'Subscribed — check your inbox for a welcome.';
       input.value = '';
     } catch (err) {
       status.className = 'status err';

@@ -63,6 +63,27 @@ SEED_MAP: dict[str, str] = {
     "92840M102": "VST",    # Vistra Corp
     "958102AT2": "WDC",    # Western Digital Corp
     "G96115103": "WYFI",   # WhiteFiber Inc
+
+    # Mega-cap tech (Appaloosa + others)
+    "037833100": "AAPL",   # Apple Inc
+    "594918104": "MSFT",   # Microsoft Corp
+    "023135106": "AMZN",   # Amazon.com Inc
+    "02079K107": "GOOG",   # Alphabet Inc Class C
+    "02079K305": "GOOGL",  # Alphabet Inc Class A
+    "30303M102": "META",   # Meta Platforms Inc Class A
+    "64110L106": "NFLX",   # Netflix Inc
+    "01609W102": "BABA",   # Alibaba Group Holding ADR
+    "90353T100": "UBER",   # Uber Technologies Inc
+    "02376R102": "AAL",    # American Airlines Group
+    "058498106": "BALL",   # Ball Corp
+    "464286830": "EWZ",    # iShares MSCI Brazil ETF
+
+    # Biotech / life sciences (Perceptive)
+    "63900R107": "NTRA",   # Natera Inc
+    "881624209": "TEVA",   # Teva Pharmaceutical Industries ADR
+    "04368H103": "ASND",   # Ascendis Pharma ADR
+    "45784P101": "INSM",   # Insmed Incorporated
+    "98138J206": "WWD",    # Woodward Inc
 }
 
 
