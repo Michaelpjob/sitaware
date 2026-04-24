@@ -210,6 +210,33 @@
   .signup .status.ok { color: var(--pos); }
   .signup .status.err { color: var(--neg); }
 
+  /* Play section */
+  .play-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 22px 18px; margin-bottom: 22px; box-shadow: var(--shadow-sm); }
+  .play-section.hidden { display: none; }
+  .play-pills { display: flex; gap: 4px; margin-bottom: 14px; flex-wrap: wrap; }
+  .play-pill { background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 5px 12px; border-radius: 999px; font: inherit; font-size: 12px; cursor: pointer; transition: all 0.12s; }
+  .play-pill:hover { background: var(--surface-hover); color: var(--text); }
+  .play-pill.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .play-head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; }
+  .play-head h2 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; color: var(--text); }
+  .play-head .summary-return { font-size: 13px; font-variant-numeric: tabular-nums; }
+  .play-head .summary-return .vs { color: var(--text-faint); margin-left: 6px; font-size: 11px; }
+  .play-thesis { color: var(--text-muted); font-size: 13px; line-height: 1.55; margin: 0 0 14px; max-width: 780px; }
+  .play-ranges { display: flex; gap: 4px; margin-bottom: 12px; }
+  .play-range { background: none; border: none; color: var(--text-muted); padding: 4px 10px; border-radius: 5px; font: inherit; font-size: 12px; cursor: pointer; font-variant-numeric: tabular-nums; }
+  .play-range:hover { background: var(--surface-hover); color: var(--text); }
+  .play-range.active { background: var(--surface-alt); color: var(--text); font-weight: 600; }
+  .play-chart-wrap { position: relative; height: 220px; margin-bottom: 14px; }
+  .play-chart-wrap canvas { max-width: 100%; }
+  .play-basket-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 10px; }
+  .play-basket-table th { text-align: left; font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  .play-basket-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-soft); color: var(--text); font-variant-numeric: tabular-nums; }
+  .play-basket-table td.num, .play-basket-table th.num { text-align: right; }
+  .play-basket-table .call-badge { display: inline-block; background: var(--pos-bg); color: var(--pos); padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 600; margin-left: 4px; }
+  .play-basket-table .ticker { color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 500; }
+  .play-footnote { color: var(--text-faint); font-size: 11px; line-height: 1.5; margin: 0; }
+  .play-footnote code { background: var(--tag-bg); padding: 0 4px; border-radius: 2px; }
+
   footer { margin-top: 22px; padding: 14px 0 4px; border-top: 1px solid var(--border); color: var(--text-faint); font-size: 12px; line-height: 1.6; }
   footer strong { color: var(--text-muted); }
   footer a { color: var(--link); text-decoration: none; }
@@ -249,6 +276,35 @@
 <div class="sub" id="sub-line"></div>
 
 <div class="summary" id="summary"></div>
+
+<section class="play-section hidden" id="play-section" aria-label="Thematic play">
+  <div class="play-pills" id="play-pills" role="tablist"></div>
+  <div class="play-head">
+    <h2 id="play-name"></h2>
+    <div class="summary-return" id="play-summary-return"></div>
+  </div>
+  <p class="play-thesis" id="play-thesis"></p>
+  <div class="play-ranges" id="play-ranges" role="tablist">
+    <button class="play-range" data-range="1D">1D</button>
+    <button class="play-range" data-range="7D">7D</button>
+    <button class="play-range" data-range="30D">30D</button>
+    <button class="play-range" data-range="YTD">YTD</button>
+    <button class="play-range" data-range="1Y">1Y</button>
+    <button class="play-range active" data-range="INCEPTION">Inception</button>
+  </div>
+  <div class="play-chart-wrap"><canvas id="play-chart"></canvas></div>
+  <table class="play-basket-table">
+    <thead>
+      <tr>
+        <th>Ticker</th>
+        <th class="num">Weight</th>
+        <th class="num" id="play-basket-return-header">Return (range)</th>
+      </tr>
+    </thead>
+    <tbody id="play-basket-body"></tbody>
+  </table>
+  <p class="play-footnote" id="play-footnote"></p>
+</section>
 
 <div class="diff-grid">
   <div class="panel buys">
@@ -315,6 +371,7 @@
 </div>
 
 <script id="funds-data" type="application/json">{{ funds_json|safe }}</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <script>
 // ---- Theme toggle ----
@@ -414,6 +471,8 @@ function setActive(slug) {
   const next = FUNDS_BY_SLUG[slug];
   if (!next) return;
   active = next;
+  // Reset the play selection when switching funds — old slug may not exist here.
+  activePlaySlug = null;
   localStorage.setItem('activeFund', slug);
   // Update URL without reloading (nice for sharing a link to a specific fund).
   const u = new URL(location.href);
@@ -482,6 +541,157 @@ function renderSummary() {
     </div>
   `;
 }
+
+// ---- Plays ----
+let activePlaySlug = null;
+let activeRange = 'INCEPTION';
+let playChart = null;
+
+function activePlay() {
+  if (!active.plays || active.plays.length === 0) return null;
+  return active.plays.find(p => p.slug === activePlaySlug) || active.plays[0];
+}
+
+function ensureChartTheme() {
+  const root = getComputedStyle(document.documentElement);
+  return {
+    text: root.getPropertyValue('--text').trim(),
+    textMuted: root.getPropertyValue('--text-muted').trim(),
+    border: root.getPropertyValue('--border').trim(),
+    borderSoft: root.getPropertyValue('--border-soft').trim(),
+    pos: root.getPropertyValue('--pos').trim(),
+    neg: root.getPropertyValue('--neg').trim(),
+    muted: root.getPropertyValue('--text-faint').trim(),
+  };
+}
+
+function renderPlay() {
+  const section = document.getElementById('play-section');
+  const play = activePlay();
+  if (!play) { section.classList.add('hidden'); if (playChart) { playChart.destroy(); playChart = null; } return; }
+  section.classList.remove('hidden');
+
+  // Pills — only show if fund has more than one play.
+  const pillsEl = document.getElementById('play-pills');
+  if (active.plays.length > 1) {
+    pillsEl.style.display = '';
+    pillsEl.innerHTML = active.plays.map(p =>
+      `<button type="button" class="play-pill ${p.slug === play.slug ? 'active' : ''}" data-slug="${p.slug}" role="tab">${p.name}</button>`
+    ).join('');
+    pillsEl.querySelectorAll('.play-pill').forEach(b => {
+      b.addEventListener('click', () => { activePlaySlug = b.dataset.slug; renderPlay(); });
+    });
+  } else {
+    pillsEl.style.display = 'none';
+    pillsEl.innerHTML = '';
+  }
+
+  // Head: name + summary return
+  document.getElementById('play-name').textContent = play.name;
+  const basketRet = play.basketReturns[activeRange];
+  const benchRet = play.benchmarkReturns[activeRange];
+  const retHtml = basketRet == null
+    ? `<span class="muted">—</span>`
+    : `<span class="${basketRet >= 0 ? 'pos' : 'neg'}">${fmtPct(basketRet * 100)}</span>`
+        + (benchRet == null ? '' : `<span class="vs">vs ${play.benchmark} ${fmtPct(benchRet * 100)}</span>`);
+  document.getElementById('play-summary-return').innerHTML = retHtml + `<span class="vs">· ${activeRange}</span>`;
+  document.getElementById('play-thesis').textContent = play.thesis;
+
+  // Range buttons — mark active
+  document.querySelectorAll('#play-ranges .play-range').forEach(b => {
+    b.classList.toggle('active', b.dataset.range === activeRange);
+  });
+
+  // Basket table — weight + range return per ticker
+  document.getElementById('play-basket-return-header').textContent = `Return (${activeRange})`;
+  const rows = Object.entries(play.weights).sort((a,b) => b[1] - a[1]);
+  document.getElementById('play-basket-body').innerHTML = rows.map(([ticker, weight]) => {
+    const r = (play.perTickerReturns[ticker] || {})[activeRange];
+    const callBadge = play.hasOption[ticker] ? `<span class="call-badge">CALL</span>` : '';
+    const rCls = r == null ? 'muted' : (r >= 0 ? 'pos' : 'neg');
+    const rText = r == null ? '—' : fmtPct(r * 100);
+    return `<tr>
+      <td><span class="ticker">${ticker}</span>${callBadge}</td>
+      <td class="num">${(weight * 100).toFixed(1)}%</td>
+      <td class="num ${rCls}">${rText}</td>
+    </tr>`;
+  }).join('');
+
+  // Footnote
+  const dropped = (play.droppedTickers || []);
+  const droppedNote = dropped.length ? ` Currently excluded (not in latest 13F): ${dropped.join(', ')}.` : '';
+  document.getElementById('play-footnote').innerHTML =
+    `Weights as of filing dated <code>${play.weightsAsOf}</code>. `
+    + `Performance applies current weights to historical prices (no quarterly rebalance). `
+    + `Benchmark: <code>${play.benchmark}</code>. `
+    + `Inception: <code>${play.inceptionDate}</code>.${droppedNote}`;
+
+  // Chart
+  const s = play.series[activeRange];
+  const theme = ensureChartTheme();
+  if (playChart) { playChart.destroy(); playChart = null; }
+  if (!s || !s.dates || s.dates.length < 2) return;
+  const ctx = document.getElementById('play-chart').getContext('2d');
+  playChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: s.dates,
+      datasets: [
+        {
+          label: play.name,
+          data: s.basket,
+          borderColor: (basketRet == null || basketRet >= 0) ? theme.pos : theme.neg,
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          tension: 0.15,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+        },
+        {
+          label: play.benchmark,
+          data: s.benchmark,
+          borderColor: theme.muted,
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          borderDash: [4, 4],
+          tension: 0.15,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: theme.textMuted, boxWidth: 16, font: { size: 11 } } },
+        tooltip: {
+          backgroundColor: theme.border, titleColor: theme.text, bodyColor: theme.text,
+          callbacks: {
+            label: (c) => {
+              const v = c.parsed.y;
+              if (v == null || isNaN(v)) return `${c.dataset.label}: —`;
+              const base = activeRange === 'INCEPTION'
+                ? `${c.dataset.label}: ${(v - 100).toFixed(2)}%`
+                : `${c.dataset.label}: ${fmtPct(v - 100)}`;
+              return base;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: theme.muted, font: { size: 10 }, maxRotation: 0, autoSkipPadding: 14 }, grid: { color: theme.borderSoft } },
+        y: { ticks: { color: theme.muted, font: { size: 10 }, callback: (v) => (v - 100 >= 0 ? '+' : '') + (v - 100).toFixed(0) + '%' }, grid: { color: theme.borderSoft } }
+      }
+    }
+  });
+}
+
+// Range-picker events
+document.querySelectorAll('#play-ranges .play-range').forEach(b => {
+  b.addEventListener('click', () => { activeRange = b.dataset.range; renderPlay(); });
+});
 
 function renderDiffs() {
   const h = active.positions;
@@ -593,6 +803,7 @@ function renderAll() {
   buildFundMenu();
   renderSummary();
   renderDiffs();
+  renderPlay();
   renderTable();
 }
 renderAll();

@@ -22,10 +22,11 @@ from pathlib import Path
 import click
 from dotenv import load_dotenv
 
-from src import alert, compute, edgar, prices, render
+from src import alert, compute, edgar, plays, prices, render
 from src.compute import AumHistoryPoint
 from src.cusip_map import CusipResolver
 from src.funds import FUNDS, Fund, fund_by_slug
+from src.plays import PlayPayload
 
 load_dotenv()
 logging.basicConfig(
@@ -140,15 +141,15 @@ def _run_one_fund(
     dry_run: bool,
     history_quarters: int,
     resolver: CusipResolver,
-) -> tuple[compute.DashboardPayload | None, list[AumHistoryPoint], bool]:
+) -> tuple[compute.DashboardPayload | None, list[AumHistoryPoint], list[PlayPayload], bool]:
     """Fetch + compute payload for one fund. Always fetches so the fund stays
-    in the multi-fund dashboard. Returns (payload, history, new_filing_detected).
+    in the multi-fund dashboard. Returns (payload, history, plays, new_filing_detected).
     """
     log.info("▶ %s (CIK %s)", fund.name, fund.cik)
     filings = edgar.get_latest_13f_filings(fund.cik, limit=2)
     if not filings:
         log.warning("No 13F-HR filings for %s — skipping.", fund.slug)
-        return None, [], False
+        return None, [], [], False
 
     latest = filings[0]
     prior = filings[1] if len(filings) > 1 else None
@@ -157,7 +158,7 @@ def _run_one_fund(
 
     if dry_run:
         log.info("  dry-run: latest %s (new=%s)", latest.accession, new_filing_detected)
-        return None, [], new_filing_detected
+        return None, [], [], new_filing_detected
 
     log.info("  fetching info table for %s…", latest.accession)
     latest_holdings = edgar.fetch_with_retry(latest)
@@ -207,7 +208,23 @@ def _run_one_fund(
         entry_prices=entry_prices,
         prices_as_of=date.today().isoformat(),
     )
-    return payload, aum_history, new_filing_detected
+
+    # Plays — one payload per configured play.
+    play_payloads: list[PlayPayload] = []
+    for play in fund.plays:
+        try:
+            pp = plays.compute_play_payload(
+                fund=fund,
+                play=play,
+                latest_holdings=latest_holdings,
+                ticker_map=ticker_map,
+                weights_as_of=latest.filing_date,
+            )
+            play_payloads.append(pp)
+        except Exception as exc:
+            log.exception("  play %s failed: %s", play.slug, exc)
+
+    return payload, aum_history, play_payloads, new_filing_detected
 
 
 @click.command()
@@ -231,19 +248,19 @@ def main(force: bool, dry_run: bool, no_email: bool, fund: str | None, history_q
 
     resolver = CusipResolver()
 
-    funds_data: list[tuple[Fund, compute.DashboardPayload, list[AumHistoryPoint]]] = []
+    funds_data: list[tuple[Fund, compute.DashboardPayload, list[AumHistoryPoint], list[PlayPayload]]] = []
     new_filings: list[tuple[Fund, compute.DashboardPayload]] = []
 
     for f in funds_to_run:
         try:
-            payload, history, new_filing = _run_one_fund(
+            payload, history, play_payloads, new_filing = _run_one_fund(
                 f, state, history_by_cik, dry_run, history_quarters, resolver
             )
         except Exception as exc:
             log.exception("Pipeline failed for %s: %s", f.slug, exc)
             continue
         if payload is not None:
-            funds_data.append((f, payload, history))
+            funds_data.append((f, payload, history, play_payloads))
             if new_filing:
                 new_filings.append((f, payload))
             state["funds"].setdefault(f.cik, {})

@@ -20,6 +20,7 @@ sys.path.insert(0, str(ROOT))
 from src.compute import AumHistoryPoint, build_dashboard_payload
 from src.edgar import Filing, parse_info_table_xml
 from src.funds import FUNDS, fund_by_slug
+from src.plays import compute_play_payload
 from src.render import write_dashboard
 
 
@@ -101,7 +102,30 @@ def main() -> int:
     funds_data = []
     for f in FUNDS:
         payload, history = fake_payload(f, q4, q3, scale=scales.get(f.slug, 1.0))
-        funds_data.append((f, payload, history))
+        # For the Play preview we parse real SA LP fixture holdings so the
+        # AI Power play (BE + friends) has weights. Appaloosa/Perceptive plays
+        # will mostly show "dropped" since their tickers aren't in the SA LP
+        # fixture — that's expected in local preview.
+        holdings_for_plays = parse_info_table_xml(q4)
+        ticker_map = {
+            "093712107": "BE", "093712AH0": "BE",
+            "21873S108": "CRWV",
+            "49427F108": "KRC", "456788108": "INFY",
+            "67066G104": "NVDA", "92840M102": "VST",
+        }
+        play_payloads = []
+        for play in f.plays:
+            try:
+                pp = compute_play_payload(
+                    fund=f, play=play,
+                    latest_holdings=holdings_for_plays,
+                    ticker_map=ticker_map,
+                    weights_as_of="2026-02-11",
+                )
+                play_payloads.append(pp)
+            except Exception as exc:
+                print(f"Skipping play {play.slug}: {exc}")
+        funds_data.append((f, payload, history, play_payloads))
 
     write_dashboard(
         funds_data,

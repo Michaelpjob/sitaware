@@ -14,6 +14,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from src.compute import AumHistoryPoint, DashboardPayload
 from src.funds import Fund
+from src.plays import PlayPayload
 
 
 def _env() -> Environment:
@@ -50,7 +51,30 @@ def _position_as_dict(p) -> dict:
     }
 
 
-def _fund_blob(fund: Fund, payload: DashboardPayload, history: list[AumHistoryPoint]) -> dict:
+def _play_as_dict(p: PlayPayload) -> dict:
+    return {
+        "name": p.name,
+        "slug": p.slug,
+        "thesis": p.thesis,
+        "inceptionDate": p.inception_date,
+        "weightsAsOf": p.weights_as_of,
+        "benchmark": p.benchmark,
+        "weights": p.weights,
+        "hasOption": p.has_option,
+        "series": p.series,
+        "perTickerReturns": p.per_ticker_returns,
+        "basketReturns": p.basket_returns,
+        "benchmarkReturns": p.benchmark_returns,
+        "droppedTickers": p.dropped_tickers,
+    }
+
+
+def _fund_blob(
+    fund: Fund,
+    payload: DashboardPayload,
+    history: list[AumHistoryPoint],
+    plays: list[PlayPayload],
+) -> dict:
     """Serialize one fund's payload for embedding in the HTML."""
     return {
         "slug": fund.slug,
@@ -76,11 +100,12 @@ def _fund_blob(fund: Fund, payload: DashboardPayload, history: list[AumHistoryPo
         "positions": [_position_as_dict(p) for p in payload.positions],
         "exits": [asdict(e) for e in payload.exits],
         "aumHistory": [asdict(p) for p in (history or [])],
+        "plays": [_play_as_dict(p) for p in (plays or [])],
     }
 
 
 def render_dashboard(
-    funds_data: list[tuple[Fund, DashboardPayload, list[AumHistoryPoint]]],
+    funds_data: list[tuple[Fund, DashboardPayload, list[AumHistoryPoint], list[PlayPayload]]],
     prices_as_of: str,
     active_slug: str | None = None,
     site_name: str | None = None,
@@ -89,8 +114,8 @@ def render_dashboard(
     repo_url: str | None = None,
     signup_endpoint: str | None = None,
 ) -> str:
-    """Render HTML. funds_data is a list of (Fund, payload, aum_history) tuples —
-    one per fund. The first entry (or one matching active_slug) is shown by default.
+    """Render HTML. funds_data is a list of (Fund, payload, aum_history, plays)
+    tuples. The first entry (or one matching active_slug) is shown by default.
     """
     if not funds_data:
         raise ValueError("render_dashboard: funds_data must not be empty")
@@ -98,7 +123,7 @@ def render_dashboard(
     env = _env()
     tmpl = env.get_template("dashboard.html.j2")
 
-    blobs = [_fund_blob(f, p, h) for (f, p, h) in funds_data]
+    blobs = [_fund_blob(f, p, h, pl) for (f, p, h, pl) in funds_data]
     active = active_slug or funds_data[0][0].slug
 
     return tmpl.render(
@@ -114,7 +139,7 @@ def render_dashboard(
 
 
 def write_dashboard(
-    funds_data: list[tuple[Fund, DashboardPayload, list[AumHistoryPoint]]],
+    funds_data: list[tuple[Fund, DashboardPayload, list[AumHistoryPoint], list[PlayPayload]]],
     prices_as_of: str,
     out_path: Path = Path("docs/index.html"),
     **kwargs,
