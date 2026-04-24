@@ -52,7 +52,7 @@ FUNDS: list[Fund] = [
                     "longer-duration half of the buildout where 2026 capex decisions show "
                     "up as 2028 electricity demand."
                 ),
-                tickers=("BE", "PSIX", "BW", "EQT", "SEI", "LBRT", "PUMP"),
+                tickers=("BE", "PSIX", "BW", "EQT", "SEI", "LBRT", "PUMP", "CLSK", "IREN"),
                 inception_date="2025-06-01",
                 benchmark="XLE",
             ),
@@ -68,8 +68,8 @@ FUNDS: list[Fund] = [
                     "networking, SanDisk for memory, Tower Semi for mixed-signal, WhiteFiber "
                     "for datacenter fiber."
                 ),
-                tickers=("CRWV", "LITE", "CORZ", "IREN", "APLD", "SNDK", "CIFR", "COHR",
-                         "TSEM", "RIOT", "HUT", "WYFI", "BTDR", "CLSK", "BITF"),
+                tickers=("CRWV", "LITE", "CORZ", "APLD", "SNDK", "CIFR", "COHR",
+                         "TSEM", "RIOT", "HUT", "WYFI", "BTDR", "BITF"),
                 inception_date="2025-06-01",
                 benchmark="IGV",
             ),
