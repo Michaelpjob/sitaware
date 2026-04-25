@@ -138,6 +138,15 @@
   .icon-btn:hover { background: var(--surface-hover); color: var(--text); }
   .icon-btn svg { width: 14px; height: 14px; }
 
+  /* Live indicator — small dot + label next to the theme toggle */
+  .live-indicator { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; background: var(--surface-alt); color: var(--text-faint); font-size: 11px; font-variant-numeric: tabular-nums; cursor: help; }
+  .live-indicator .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-very-faint); }
+  .live-indicator.on { color: var(--pos); background: var(--pos-bg); }
+  .live-indicator.on .dot { background: var(--pos); animation: live-pulse 2.4s ease-in-out infinite; }
+  .live-indicator.err { color: var(--neg); background: var(--neg-bg); }
+  .live-indicator.err .dot { background: var(--neg); }
+  @keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
   .sub { color: var(--text-muted); font-size: 13px; margin-bottom: 18px; }
   .sub a { color: var(--link); text-decoration: none; }
   .sub a:hover { text-decoration: underline; }
@@ -270,6 +279,9 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
       <span id="theme-label">Auto</span>
     </button>
+    <span class="live-indicator" id="live-indicator" title="Live prices auto-refresh from Yahoo Finance">
+      <span class="dot"></span><span class="text">Static</span>
+    </span>
   </div>
 </div>
 
@@ -807,6 +819,86 @@ function renderAll() {
   renderTable();
 }
 renderAll();
+
+// ---- Live prices overlay ----
+// Fetch the latest quote for every ticker we display and overlay onto each
+// fund's position rows + summary stat. The play chart still uses the daily
+// historical series (rebuilt by the weekly cron) — it's only the table /
+// "Current Px" / "Current $" / "Est. Return" columns that go live here.
+(function liveOverlay() {
+  const indicator = document.getElementById('live-indicator');
+  function setIndicator(state, label) {
+    indicator.classList.remove('on', 'err');
+    if (state) indicator.classList.add(state);
+    indicator.querySelector('.text').textContent = label;
+  }
+
+  function collectTickers() {
+    const set = new Set();
+    FUNDS.forEach(f => {
+      (f.positions || []).forEach(p => { if (p.ticker) set.add(p.ticker.toUpperCase()); });
+      (f.plays || []).forEach(pl => {
+        Object.keys(pl.weights || {}).forEach(t => set.add(t.toUpperCase()));
+        if (pl.benchmark) set.add(pl.benchmark.toUpperCase());
+      });
+    });
+    return [...set];
+  }
+
+  function applyQuotes(quotes) {
+    let updates = 0;
+    FUNDS.forEach(f => {
+      (f.positions || []).forEach(p => {
+        const q = p.ticker ? quotes[p.ticker.toUpperCase()] : null;
+        if (q && q.price != null && isFinite(q.price)) {
+          p.currentPrice = q.price;
+          p.currentValueUsd = p.latestShares ? p.latestShares * q.price : null;
+          if (p.entryPrice && p.entryPrice > 0) {
+            p.estReturnPct = ((q.price - p.entryPrice) / p.entryPrice) * 100;
+          }
+          updates += 1;
+        }
+      });
+    });
+    return updates;
+  }
+
+  let inFlight = false;
+  async function refresh() {
+    if (inFlight) return;
+    inFlight = true;
+    setIndicator(null, 'Loading…');
+    try {
+      const tickers = collectTickers();
+      if (tickers.length === 0) { setIndicator(null, 'Static'); return; }
+      const resp = await fetch('/api/prices?tickers=' + encodeURIComponent(tickers.join(',')), {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      if (!data.ok || !data.quotes) throw new Error('bad response');
+      const updated = applyQuotes(data.quotes);
+      if (updated === 0) { setIndicator('err', 'Static'); return; }
+      const ts = data.asOf ? new Date(data.asOf * 1000) : new Date();
+      const label = ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setIndicator('on', `Live · ${label}`);
+      renderAll();  // Re-render everything with the overlaid prices.
+    } catch (err) {
+      console.warn('live overlay failed:', err);
+      setIndicator('err', 'Static');
+    } finally {
+      inFlight = false;
+    }
+  }
+
+  refresh();
+  // Refresh when the tab becomes visible again (helps when laptop wakes).
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refresh();
+  });
+  // And on a 5-min cadence while the tab is open.
+  setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, 5 * 60 * 1000);
+})();
 
 {% if signup_endpoint %}
 // ---- Signup form ----
