@@ -185,7 +185,8 @@
   .filters input[type="text"]::placeholder { color: var(--text-very-faint); }
   .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); cursor: pointer; }
 
-  /* Holdings table */
+  /* Holdings table — wrapped so overflow scrolls inside instead of the page. */
+  .holdings-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 6px; }
   table.holdings { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; font-size: 13px; box-shadow: var(--shadow-sm); }
   table.holdings th { background: var(--surface-alt); padding: 10px; text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap; }
   table.holdings th:hover { background: var(--surface-hover); color: var(--text); }
@@ -257,7 +258,62 @@
     .wrap { padding: 14px; }
     .fund-picker button.fund-btn { font-size: 18px; }
     .top-bar .tag { display: none; }
+    .play-section { padding: 16px 14px; }
+    .play-head { flex-direction: column; align-items: flex-start; gap: 4px; }
+    .play-ranges { flex-wrap: wrap; }
+    .play-chart-wrap { height: 200px; }
   }
+
+  /* Phone */
+  @media (max-width: 600px) {
+    .summary { grid-template-columns: 1fr; gap: 8px; }
+    .stat { padding: 10px 12px; }
+    .stat .value { font-size: 16px; }
+    .stat .sparkline { height: 24px; }
+    .wrap { padding: 12px 10px; }
+    .top-bar { gap: 8px; padding-bottom: 10px; margin-bottom: 12px; }
+    .top-bar .actions { gap: 4px; }
+    .icon-btn { padding: 5px 8px; font-size: 12px; }
+    .icon-btn span { display: none; }   /* hide "Auto/Light/Dark" label on tiny screens */
+    .live-indicator { padding: 3px 6px; font-size: 10px; }
+    .fund-picker button.fund-btn { font-size: 17px; padding-right: 4px; }
+    .fund-menu { min-width: 220px; }
+    .sub { font-size: 12px; }
+    .filters input[type="text"] { width: 100%; }
+    .filters { gap: 8px; }
+    .signup { padding: 14px 16px; gap: 12px; }
+    .signup input[type="email"] { min-width: 0; flex: 1 1 100%; }
+    .signup button { flex: 1 1 100%; }
+    .signup form { width: 100%; }
+    .panel { padding: 12px 14px; }
+
+    /* Compact holdings table — hide low-value columns and inline the type badge. */
+    table.holdings { font-size: 12px; border-radius: 6px; min-width: 100%; }
+    table.holdings th, table.holdings td { padding: 6px 7px; }
+    table.holdings .name-cell { white-space: normal; word-break: break-word; }
+    /* Visible: Issuer, Value, %Port, Current$, Est.Return */
+    table.holdings th:nth-child(2),  /* Type */
+    table.holdings td:nth-child(2),
+    table.holdings th:nth-child(5),  /* Shares */
+    table.holdings td:nth-child(5),
+    table.holdings th:nth-child(6),  /* Q-end Px */
+    table.holdings td:nth-child(6),
+    table.holdings th:nth-child(7),  /* Est. Entry */
+    table.holdings td:nth-child(7),
+    table.holdings th:nth-child(8),  /* Current Px */
+    table.holdings td:nth-child(8),
+    table.holdings th:nth-child(11), /* QoQ Shares */
+    table.holdings td:nth-child(11) { display: none; }
+
+    /* Show inline option-type badge that's normally hidden */
+    .name-cell .inline-pc { display: inline-block !important; }
+
+    .play-basket-table { font-size: 12px; }
+    .play-basket-table th, .play-basket-table td { padding: 5px 6px; }
+  }
+
+  /* Inline option-type badge — only rendered on mobile via the CSS above. */
+  .name-cell .inline-pc { display: none; }
 </style>
 </head>
 <body>
@@ -340,6 +396,7 @@
   <span style="margin-left:auto;color:var(--text-faint);font-size:12px;" id="row-count"></span>
 </div>
 
+<div class="holdings-scroll">
 <table class="holdings" id="table">
   <thead>
     <tr>
@@ -358,6 +415,7 @@
   </thead>
   <tbody id="tbody"></tbody>
 </table>
+</div>
 
 {% if signup_endpoint %}
 <div class="signup">
@@ -768,9 +826,13 @@ function renderTable() {
     const qoqDisplay = x.isNew
       ? '<span class="pos">NEW</span>'
       : (x.qoqSharesPct == null ? '—' : `<span class="${clsReturn(x.qoqSharesPct)}">${fmtPct(x.qoqSharesPct)}</span>`);
+    // Inline type badge — only visible on phone (CSS-controlled).
+    const inlinePc = x.putCall
+      ? `<span class="pc-tag inline-pc ${x.putCall === 'Call' ? 'pc-call' : 'pc-put'}">${x.putCall.toUpperCase()}</span>`
+      : '';
     return `
       <tr class="${x.putCall ? 'option-row' : ''}">
-        <td class="name-cell">${x.issuer} <span class="ticker">${x.ticker || x.cusip}</span> ${flagIcon}</td>
+        <td class="name-cell">${x.issuer} <span class="ticker">${x.ticker || x.cusip}</span>${inlinePc} ${flagIcon}</td>
         <td>${typeLabel}</td>
         <td class="num">${fmtMoney(x.latestValueUsd)}</td>
         <td class="num">${fmtPctClean(x.pctPortfolio)}</td>
