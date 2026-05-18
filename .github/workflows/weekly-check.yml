@@ -5,11 +5,6 @@ on:
     # Monday 13:00 UTC = 9am ET / 6am PT. Cron can run a few minutes late — that's fine.
     - cron: "0 13 * * 1"
   workflow_dispatch:
-    inputs:
-      force:
-        description: "Regenerate dashboard even if no new filing"
-        type: boolean
-        default: false
 
 permissions:
   contents: write        # commit updated dashboard + state
@@ -43,9 +38,8 @@ jobs:
           REPO_URL: ${{ vars.REPO_URL }}
           SIGNUP_ENDPOINT: ${{ vars.SIGNUP_ENDPOINT }}
         run: |
-          FLAGS=""
-          if [ "${{ inputs.force }}" = "true" ]; then FLAGS="--force"; fi
-          python run.py $FLAGS 2>&1 | tee tracker.log
+          # Always force re-render so prices refresh weekly even when no new filing landed.
+          python run.py --force 2>&1 | tee tracker.log
           # Surface whether a new filing was written so later steps can act on it.
           if grep -q "Diff summary:" tracker.log; then
             echo "new_filing=true" >> "$GITHUB_OUTPUT"
